@@ -36,6 +36,8 @@ axios-rat-scan --fast
 axios-rat-scan --no-process
 ```
 
+![test](./test.gif)
+
 ## What it checks
 
 | Phase | What |
