@@ -1,4 +1,4 @@
-# axios-rat-scan
+# .axios-rat-catcher
 
 Cross-platform scanner for the [axios supply chain RAT](https://www.elastic.co/security-labs/axios-one-rat-to-rule-them-all) (2026-03-31). Single static binary, no dependencies.
 
@@ -8,7 +8,7 @@ Compromised versions `axios@1.14.1` and `axios@0.30.4` inject `plain-crypto-js@4
 
 ## Download
 
-**[Latest release](https://github.com/brianclaridge/.axios-rat-helper/releases/latest)**
+**[Latest release](https://github.com/brianclaridge/.axios-rat-catcher/releases/latest)**
 
 | Platform | Binary |
 |---|---|

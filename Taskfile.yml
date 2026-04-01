@@ -2,8 +2,41 @@ version: '3'
 
 vars:
   BINARY: ./target/release/axios-rat-scan{{if eq OS "windows"}}.exe{{end}}
+  CLAUDE_MODEL: "claude-opus-4-6[1m]"
+  STATUSLINE_PLUGIN: "{{toSlash .ROOT_DIR}}/.claude/statusline"
+  CLAUDE_CONFIG_DIR: "{{toSlash .TASKFILE_DIR}}/.data/claude/config"
+  CLAUDE_CODE_TMPDIR: "{{toSlash .TASKFILE_DIR}}/.data/claude/tmp"
+
+env:
+  CLAUDE_CONFIG_DIR: "{{.CLAUDE_CONFIG_DIR}}"
+  CLAUDE_CODE_TMPDIR: "{{.CLAUDE_CODE_TMPDIR}}"
 
 tasks:
+  default:
+    cmds:
+      - task --list
+
+  claude:
+    desc: "resume or start claude session"
+    aliases:
+      - local
+    vars:
+      ARGS: >-
+        --ide
+        --chrome
+        --model {{.CLAUDE_MODEL}}
+        --effort high
+        --brief
+        --remote-control
+        --verbose
+        --plugin-dir {{.STATUSLINE_PLUGIN}}
+    cmds:
+      - claude update 2>/dev/null
+      - claude {{.ARGS}} --continue 2>/dev/null || claude {{.ARGS}}
+    ignore_error: true
+    interactive: true
+    silent: true
+
   build:
     desc: Build the scanner in release mode
     cmds:
