@@ -1,0 +1,68 @@
+version: '3'
+
+vars:
+  BINARY: ./target/release/axios-rat-scan{{if eq OS "windows"}}.exe{{end}}
+
+tasks:
+  build:
+    desc: Build the scanner in release mode
+    cmds:
+      - cargo build --release
+
+  build-dev:
+    desc: Build in debug mode (faster compile)
+    cmds:
+      - cargo build
+
+  scan:
+    desc: Auto-detect and scan all mounted drives
+    deps: [build]
+    cmds:
+      - '{{.BINARY}}'
+
+  scan-fast:
+    desc: Scan all drives, stop at first critical finding
+    deps: [build]
+    cmds:
+      - '{{.BINARY}} --fast'
+
+  scan-json:
+    desc: Scan all drives with JSON output
+    deps: [build]
+    cmds:
+      - '{{.BINARY}} --json'
+
+  scan-quiet:
+    desc: Scan without process/network checks (filesystem only)
+    deps: [build]
+    cmds:
+      - '{{.BINARY}} --no-process'
+
+  scan-path:
+    desc: "Scan a specific path (usage: task scan-path -- /some/path)"
+    deps: [build]
+    cmds:
+      - '{{.BINARY}} {{.CLI_ARGS}}'
+
+  report:
+    desc: Scan all drives and save JSON report
+    deps: [build]
+    cmds:
+      - '{{.BINARY}} --json > scan_report.json'
+      - echo "Report saved to scan_report.json"
+
+  clean:
+    desc: Remove build artifacts
+    cmds:
+      - cargo clean
+      - rm -f npm_sources_map.yml scan_report.json
+
+  check:
+    desc: Run cargo check (fast compile validation)
+    cmds:
+      - cargo check
+
+  lint:
+    desc: Run clippy lints
+    cmds:
+      - cargo clippy -- -W clippy::all
