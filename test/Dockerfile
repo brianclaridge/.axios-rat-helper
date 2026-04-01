@@ -7,7 +7,9 @@ RUN cargo build --release
 RUN strip target/release/axios-rat-scan
 
 ## Stage 2: Test environment — ~100 realistic projects, 4 infected
-FROM debian:bookworm-slim
+FROM ghcr.io/charmbracelet/vhs
+
+USER root
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 procps net-tools iproute2 bash \
@@ -15,8 +17,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY --from=builder /build/target/release/axios-rat-scan /usr/local/bin/axios-rat-scan
 
-# ── Scaffold script to create realistic project tree ────────────
-# Creates ~100 clean projects + 4 infected ones hiding among them
+# ── Scaffold realistic project tree ─────────────────────────────
 COPY test/scaffold.sh /scaffold.sh
 RUN chmod +x /scaffold.sh && /scaffold.sh
 
@@ -24,8 +25,9 @@ RUN chmod +x /scaffold.sh && /scaffold.sh
 RUN echo '#!/usr/bin/env python3\nimport time\nwhile True: time.sleep(60)' > /tmp/ld.py
 RUN echo 'dropper-payload' > /tmp/6202033
 
-# ── Test script ─────────────────────────────────────────────────
+# ── Test + demo scripts ────────────────────────────────────────
 COPY test/verify.sh /verify.sh
+COPY test/demo.tape /demo.tape
 RUN chmod +x /verify.sh
 
 WORKDIR /projects

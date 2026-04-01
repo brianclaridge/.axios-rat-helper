@@ -160,4 +160,18 @@ fi
 echo "  ============================================="
 echo -e "\033[0m"
 
+# ── GIF recording (if /output is mounted) ──────────────────
+if [ -d /output ] && command -v vhs &> /dev/null; then
+    echo -e "\033[1m  Recording demo GIF...\033[0m"
+    # Re-plant artifacts for the recording
+    echo '#!/usr/bin/env python3' > /tmp/ld.py
+    echo 'dropper-payload' > /tmp/6202033
+    vhs /demo.tape 2>&1 || true
+    if [ -f /output/test.gif ]; then
+        echo -e "  \033[32m\u2713\033[0m Saved to /output/test.gif\n"
+    else
+        echo -e "  \033[33m! GIF recording skipped (VHS needs chromium in container)\033[0m\n"
+    fi
+fi
+
 exit "$FAIL"
