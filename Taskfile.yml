@@ -10,6 +10,7 @@ vars:
 env:
   CLAUDE_CONFIG_DIR: "{{.CLAUDE_CONFIG_DIR}}"
   CLAUDE_CODE_TMPDIR: "{{.CLAUDE_CODE_TMPDIR}}"
+  DISABLE_AUTOUPDATER: "1"
 
 tasks:
   default:
